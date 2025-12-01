@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 
-const API_URL = "http://localhost:3000";
+const API_URL = "https://filesystembk-1.onrender.com";
 
 function Notification({ message, type, onClear }) {
   useEffect(() => {
@@ -23,11 +23,25 @@ function Notification({ message, type, onClear }) {
   );
 }
 
+useEffect(() => {
+  const healthcheck = async () => {
+    try {
+      const res = await fetch(`${API_URL}/`);
+      if (!res.ok) throw new Error('Server not healthy');
+    } catch (e) {
+      alert('Could not connect to the server. Please ensure the backend server is running.');
+    }
+  };
+  healthcheck();
+  setServerHealthy(true);
+},[])
+
 export default function App() {
   const [file, setFile] = useState(null);
   const [files, setFiles] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [notification, setNotification] = useState({ message: '', type: '' });
+  const [serverHealthy, setServerHealthy] = useState(true);
 
   useEffect(() => { fetchList(); }, []);
 
@@ -131,6 +145,11 @@ export default function App() {
           <p className="text-gray-600">Try uploading, downloading, and managing checksum-verified files.</p>
         </header>
 
+        <div className="mb-8">
+          <p className="text-sm text-gray-400"> It might take 50 seconds to start the server for the first time. Please be patient. </p>
+          {serverHealthy}
+          </div>
+
         <div className="bg-white/10 shadow-md rounded-lg p-6 mb-8">
           <h2 className="text-xl font-semibold mb-4">Upload a New File</h2>
           <div className="flex items-center space-x-4">
@@ -140,6 +159,7 @@ export default function App() {
               className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
             />
             <button
+              
               onClick={upload}
               disabled={isLoading}
               className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 disabled:bg-blue-300 transition-colors"
@@ -154,7 +174,7 @@ export default function App() {
             <h2 className="text-xl font-semibold">Stored Files</h2>
             {/* <button onClick={handleVerify} className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 text-sm">
               Verify All
-            </button> */}
+            </button>  */}
           </div>
           <ul className="space-y-3">
             {files.length > 0 ? files.map(f => (
