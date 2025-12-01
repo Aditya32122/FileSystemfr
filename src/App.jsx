@@ -54,6 +54,11 @@ export default function App() {
   const [notification, setNotification] = useState({ message: '', type: '' });
   const [serverHealthy, setServerHealthy] = useState(false);
   const [healthCheckComplete, setHealthCheckComplete] = useState(false);
+  
+  // New states for text upload
+  const [uploadMode, setUploadMode] = useState('file'); // 'file' or 'text'
+  const [textContent, setTextContent] = useState('');
+  const [textFileName, setTextFileName] = useState('');
 
   // Health check effect
   useEffect(() => {
@@ -99,17 +104,40 @@ export default function App() {
   };
 
   const upload = async () => {
-    if (!file) return showNotification("Please choose a file first.", 'error');
+    if (uploadMode === 'file' && !file) {
+      return showNotification("Please choose a file first.", 'error');
+    }
+    
+    if (uploadMode === 'text' && (!textContent.trim() || !textFileName.trim())) {
+      return showNotification("Please provide both filename and text content.", 'error');
+    }
+
     setIsLoading(true);
     const form = new FormData();
-    form.append("file", file);
+    
+    if (uploadMode === 'file') {
+      form.append("file", file);
+    } else {
+      // Create a file from text content
+      const blob = new Blob([textContent], { type: 'text/plain' });
+      const textFile = new File([blob], textFileName, { type: 'text/plain' });
+      form.append("file", textFile);
+    }
+
     try {
       const res = await fetch(`${API_URL}/upload`, { method: "POST", body: form });
       if (res.ok) {
         showNotification("File uploaded successfully!");
         fetchList();
-        setFile(null);
-        document.querySelector('input[type="file"]').value = '';
+        
+        // Clear form
+        if (uploadMode === 'file') {
+          setFile(null);
+          document.querySelector('input[type="file"]').value = '';
+        } else {
+          setTextContent('');
+          setTextFileName('');
+        }
       } else {
         const err = await res.json();
         showNotification(`Upload failed: ${err.error}`, 'error');
@@ -158,19 +186,6 @@ export default function App() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleCorrupt = async (id, filename) => {
-    if (!window.confirm(`This is a test function. Are you sure you want to corrupt the primary copy of "${filename}"?`)) return;
-    await fetch(`${API_URL}/debug/corrupt/${id}`, { method: 'POST' });
-    showNotification(`Primary file for "${filename}" has been corrupted. Try downloading it to see self-healing.`, 'success');
-  };
-
-  const handleVerify = async () => {
-    const res = await fetch(`${API_URL}/verify`);
-    const report = await res.json();
-    const reportString = report.map(r => `${r.filename}: ${r.status}`).join('\n');
-    alert('Verification Report:\n\n' + reportString);
   };
 
   // Show loader while health check is in progress
@@ -224,20 +239,88 @@ export default function App() {
 
           <div className="bg-white/10 backdrop-blur-lg shadow-md rounded-lg p-6 mb-8">
             <h2 className="text-xl font-semibold mb-4 text-white">Upload a New File</h2>
-            <div className="flex items-center space-x-4">
-              <input
-                type="file"
-                onChange={e => setFile(e.target.files[0])}
-                className="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-              />
+            
+            {/* Upload Mode Toggle */}
+            <div className="flex mb-4 space-x-4">
               <button
-                onClick={upload}
-                disabled={isLoading}
-                className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 disabled:bg-blue-300 transition-colors"
+                onClick={() => setUploadMode('file')}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  uploadMode === 'file' 
+                    ? 'bg-blue-500 text-white' 
+                    : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+                }`}
               >
-                {isLoading ? 'Uploading...' : 'Upload'}
+                 Upload File
+              </button>
+              <button
+                onClick={() => setUploadMode('text')}
+                className={`px-4 py-2 rounded-lg transition-colors ${
+                  uploadMode === 'text' 
+                    ? 'bg-blue-500 text-white' 
+                    : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+                }`}
+              >
+                Create Text File
               </button>
             </div>
+
+            {/* File Upload Mode */}
+            {uploadMode === 'file' && (
+              <div className="flex items-center space-x-4">
+                <input
+                  type="file"
+                  onChange={e => setFile(e.target.files[0])}
+                  className="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                />
+                <button
+                  onClick={upload}
+                  disabled={isLoading}
+                  className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 disabled:bg-blue-300 transition-colors"
+                >
+                  {isLoading ? 'Uploading...' : 'Upload'}
+                </button>
+              </div>
+            )}
+
+            {/* Text Upload Mode */}
+            {uploadMode === 'text' && (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    File Name (with extension, e.g., myfile.txt)
+                  </label>
+                  <input
+                    type="text"
+                    value={textFileName}
+                    onChange={(e) => setTextFileName(e.target.value)}
+                    placeholder="Enter filename (e.g., notes.txt, config.json)"
+                    className="w-full px-3 py-2 bg-white/20 border border-gray-500 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-300 mb-2">
+                    Text Content
+                  </label>
+                  <textarea
+                    value={textContent}
+                    onChange={(e) => setTextContent(e.target.value)}
+                    placeholder="Paste or type your text content here..."
+                    rows={8}
+                    className="w-full px-3 py-2 bg-white/20 border border-gray-500 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-vertical"
+                  />
+                  <div className="text-xs text-gray-400 mt-1">
+                    Characters: {textContent.length}
+                  </div>
+                </div>
+                <button
+                  onClick={upload}
+                  disabled={isLoading || !textContent.trim() || !textFileName.trim()}
+                  className="w-full bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 disabled:bg-blue-300 transition-colors"
+                >
+                  {isLoading ? 'Creating File...' : 'Create & Upload File'}
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="bg-white/10 backdrop-blur-lg shadow-md rounded-lg p-6">
