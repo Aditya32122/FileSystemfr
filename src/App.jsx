@@ -23,12 +23,7 @@ function Notification({ message, type, onClear }) {
   );
 }
 
-useEffect(async () => {
-  const res = await fetch(`${API_URL}/`);
-  if (!res.ok) throw new Error('Server not healthy');
-  setServerHealthy(true);
-  
-},[])
+
 
 export default function App() {
   const [file, setFile] = useState(null);
@@ -36,6 +31,13 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(false);
   const [notification, setNotification] = useState({ message: '', type: '' });
   const [serverHealthy, setServerHealthy] = useState(true);
+
+  useEffect(async () => {
+  const res = await fetch(`${API_URL}/`);
+  if (!res.ok) throw new Error('Server not healthy');
+  setServerHealthy(true);
+  
+},[])
 
   useEffect(() => { fetchList(); }, []);
 
