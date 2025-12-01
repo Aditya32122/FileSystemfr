@@ -23,17 +23,11 @@ function Notification({ message, type, onClear }) {
   );
 }
 
-useEffect(() => {
-  const healthcheck = async () => {
-    try {
-      const res = await fetch(`${API_URL}/`);
-      if (!res.ok) throw new Error('Server not healthy');
-    } catch (e) {
-      alert('Could not connect to the server. Please ensure the backend server is running.');
-    }
-  };
-  healthcheck();
+useEffect(async () => {
+  const res = await fetch(`${API_URL}/`);
+  if (!res.ok) throw new Error('Server not healthy');
   setServerHealthy(true);
+  
 },[])
 
 export default function App() {
