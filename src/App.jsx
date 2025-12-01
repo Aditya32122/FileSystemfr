@@ -25,7 +25,7 @@ function Notification({ message, type, onClear }) {
 
 function ServerLoader() {
   return (
-    <div className="h-screen w-screen flex justify-center items-center bg-gradient-to-br from-blue-900 to-purple-900">
+    <div className="h-screen w-screen flex justify-center items-center bg-gradient-to-br">
       <div className="text-center">
         <div className="mb-6">
           {/* Spinning loader */}
@@ -181,7 +181,7 @@ export default function App() {
   // Show error state if server is not healthy
   if (healthCheckComplete && !serverHealthy) {
     return (
-      <div className="h-screen w-screen flex justify-center items-center bg-gradient-to-br from-red-900 to-purple-900">
+      <div className="h-screen w-screen flex justify-center items-center bg-gradient-to-br">
         <div className="text-center p-8">
           <div className="mb-6">
             <div className="w-16 h-16 mx-auto bg-red-500 rounded-full flex items-center justify-center">
@@ -206,7 +206,7 @@ export default function App() {
   // Main application UI (only shown when server is healthy)
   return (
     <>
-      <div className="h-screen w-screen flex justify-center items-center bg-gradient-to-br from-blue-900 to-purple-900">
+      <div className="h-screen w-screen flex justify-center items-center bg-gradient-to-br">
         <Notification message={notification.message} type={notification.type} onClear={() => setNotification({ message: '', type: '' })} />
 
         <div className="p-4 md:p-8 max-w-4xl mx-auto">
