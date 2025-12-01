@@ -23,23 +23,66 @@ function Notification({ message, type, onClear }) {
   );
 }
 
-
+function ServerLoader() {
+  return (
+    <div className="h-screen w-screen flex justify-center items-center bg-gradient-to-br from-blue-900 to-purple-900">
+      <div className="text-center">
+        <div className="mb-6">
+          {/* Spinning loader */}
+          <div className="w-16 h-16 mx-auto border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+        </div>
+        <h2 className="text-2xl font-bold text-white mb-2">Starting Server</h2>
+        <p className="text-gray-300 max-w-md">
+          Please wait while we connect to the server. This might take up to 50 seconds for the first time.
+        </p>
+        <div className="mt-4">
+          <div className="flex justify-center space-x-1">
+            <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+            <div className="w-2 h-2 bg-white rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+            <div className="w-2 h-2 bg-white rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
   const [file, setFile] = useState(null);
   const [files, setFiles] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [notification, setNotification] = useState({ message: '', type: '' });
-  const [serverHealthy, setServerHealthy] = useState(true);
+  const [serverHealthy, setServerHealthy] = useState(false);
+  const [healthCheckComplete, setHealthCheckComplete] = useState(false);
 
-  useEffect(async () => {
-  const res = await fetch(`${API_URL}/`);
-  if (!res.ok) throw new Error('Server not healthy');
-  setServerHealthy(true);
-  
-},[])
+  // Health check effect
+  useEffect(() => {
+    const checkServerHealth = async () => {
+      try {
+        const res = await fetch(`${API_URL}/`);
+        if (res.ok) {
+          setServerHealthy(true);
+          showNotification('Server connected successfully!');
+        } else {
+          throw new Error('Server not healthy');
+        }
+      } catch (error) {
+        setServerHealthy(false);
+        showNotification('Failed to connect to server. Please try refreshing.', 'error');
+      } finally {
+        setHealthCheckComplete(true);
+      }
+    };
 
-  useEffect(() => { fetchList(); }, []);
+    checkServerHealth();
+  }, []);
+
+  // Fetch files only after server is healthy
+  useEffect(() => {
+    if (serverHealthy && healthCheckComplete) {
+      fetchList();
+    }
+  }, [serverHealthy, healthCheckComplete]);
 
   const showNotification = (message, type = 'success') => {
     setNotification({ message, type });
@@ -130,64 +173,93 @@ export default function App() {
     alert('Verification Report:\n\n' + reportString);
   };
 
-  return (
-    <>
-      <div className="h-screen w-screen flex justify-center items-center">
-      <Notification message={notification.message} type={notification.type} onClear={() => setNotification({ message: '', type: '' })} />
+  // Show loader while health check is in progress
+  if (!healthCheckComplete) {
+    return <ServerLoader />;
+  }
 
-      <div className="p-4 md:p-8 max-w-4xl mx-auto">
-        <header className="text-center mb-8">
-          <h1 className="text-3xl md:text-4xl font-bold mb-2">Secure File System</h1>
-          <p className="text-gray-600">Try uploading, downloading, and managing checksum-verified files.</p>
-        </header>
-
-        <div className="mb-8">
-          <p className="text-sm text-gray-400"> It might take 50 seconds to start the server for the first time. Please be patient. </p>
-          {serverHealthy}
+  // Show error state if server is not healthy
+  if (healthCheckComplete && !serverHealthy) {
+    return (
+      <div className="h-screen w-screen flex justify-center items-center bg-gradient-to-br from-red-900 to-purple-900">
+        <div className="text-center p-8">
+          <div className="mb-6">
+            <div className="w-16 h-16 mx-auto bg-red-500 rounded-full flex items-center justify-center">
+              <span className="text-white text-2xl">✕</span>
+            </div>
           </div>
-
-        <div className="bg-white/10 shadow-md rounded-lg p-6 mb-8">
-          <h2 className="text-xl font-semibold mb-4">Upload a New File</h2>
-          <div className="flex items-center space-x-4">
-            <input
-              type="file"
-              onChange={e => setFile(e.target.files[0])}
-              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
-            />
-            <button
-              
-              onClick={upload}
-              disabled={isLoading}
-              className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 disabled:bg-blue-300 transition-colors"
-            >
-              {isLoading ? 'Uploading...' : 'Upload'}
-            </button>
-          </div>
-        </div>
-
-        <div className="bg-white/10 shadow-md rounded-lg p-6">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold">Stored Files</h2>
-            {/* <button onClick={handleVerify} className="bg-gray-500 text-white px-4 py-2 rounded-lg hover:bg-gray-600 text-sm">
-              Verify All
-            </button>  */}
-          </div>
-          <ul className="space-y-3">
-            {files.length > 0 ? files.map(f => (
-              <li key={f.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white/30 p-3 rounded-lg">
-                <span className="font-medium text-white mb-2 sm:mb-0">{f.filename}</span>
-                <div className="flex space-x-2">
-                  <button onClick={() => download(f.id, f.filename)} className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 text-xs">Download</button>
-                  <button onClick={() => handleDelete(f.id, f.filename)} disabled={isLoading} className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 disabled:bg-red-300 text-xs">Delete</button>
-                </div>
-              </li>
-            )) : (
-              <p className="text-gray-500 text-center py-4">No files have been uploaded yet.</p>
-            )}
-          </ul>
+          <h2 className="text-2xl font-bold text-white mb-2">Server Unavailable</h2>
+          <p className="text-gray-300 mb-4">
+            Unable to connect to the file server. Please try again later.
+          </p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="bg-red-500 text-white px-6 py-2 rounded-lg hover:bg-red-600 transition-colors"
+          >
+            Retry Connection
+          </button>
         </div>
       </div>
-    </div>
+    );
+  }
+
+  // Main application UI (only shown when server is healthy)
+  return (
+    <>
+      <div className="h-screen w-screen flex justify-center items-center bg-gradient-to-br from-blue-900 to-purple-900">
+        <Notification message={notification.message} type={notification.type} onClear={() => setNotification({ message: '', type: '' })} />
+
+        <div className="p-4 md:p-8 max-w-4xl mx-auto">
+          <header className="text-center mb-8">
+            <h1 className="text-3xl md:text-4xl font-bold mb-2 text-white">Secure File System</h1>
+            <p className="text-gray-300">Try uploading, downloading, and managing checksum-verified files.</p>
+          </header>
+
+          <div className="mb-8">
+            <div className="flex items-center justify-center space-x-2 text-green-400">
+              <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+              <span className="text-sm">Server Connected</span>
+            </div>
+          </div>
+
+          <div className="bg-white/10 backdrop-blur-lg shadow-md rounded-lg p-6 mb-8">
+            <h2 className="text-xl font-semibold mb-4 text-white">Upload a New File</h2>
+            <div className="flex items-center space-x-4">
+              <input
+                type="file"
+                onChange={e => setFile(e.target.files[0])}
+                className="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+              />
+              <button
+                onClick={upload}
+                disabled={isLoading}
+                className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 disabled:bg-blue-300 transition-colors"
+              >
+                {isLoading ? 'Uploading...' : 'Upload'}
+              </button>
+            </div>
+          </div>
+
+          <div className="bg-white/10 backdrop-blur-lg shadow-md rounded-lg p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-white">Stored Files</h2>
+            </div>
+            <ul className="space-y-3">
+              {files.length > 0 ? files.map(f => (
+                <li key={f.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white/20 backdrop-blur-sm p-3 rounded-lg">
+                  <span className="font-medium text-white mb-2 sm:mb-0">{f.filename}</span>
+                  <div className="flex space-x-2">
+                    <button onClick={() => download(f.id, f.filename)} className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 text-xs">Download</button>
+                    <button onClick={() => handleDelete(f.id, f.filename)} disabled={isLoading} className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 disabled:bg-red-300 text-xs">Delete</button>
+                  </div>
+                </li>
+              )) : (
+                <p className="text-gray-400 text-center py-4">No files have been uploaded yet.</p>
+              )}
+            </ul>
+          </div>
+        </div>
+      </div>
     </>
   );
 }
