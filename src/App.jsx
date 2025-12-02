@@ -25,10 +25,9 @@ function Notification({ message, type, onClear }) {
 
 function ServerLoader() {
   return (
-    <div className="h-screen w-screen flex justify-center items-center bg-gradient-to-br">
+    <div className="h-screen w-screen flex justify-center items-center bg-gradient-to-br from-gray-900 to-gray-800" style={{ backgroundColor: '#242424' }}>
       <div className="text-center">
         <div className="mb-6">
-          {/* Spinning loader */}
           <div className="w-16 h-16 mx-auto border-4 border-white border-t-transparent rounded-full animate-spin"></div>
         </div>
         <h2 className="text-2xl font-bold text-white mb-2">Starting Server</h2>
@@ -43,6 +42,123 @@ function ServerLoader() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+// New component for bucket health status
+function BucketHealthStatus() {
+  const [bucketHealth, setBucketHealth] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const checkBucketHealth = async () => {
+    setIsLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/health/buckets`);
+      const data = await res.json();
+      setBucketHealth(data);
+    } catch (error) {
+      setBucketHealth({ error: 'Failed to check bucket health' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    checkBucketHealth();
+  }, []);
+
+  if (!bucketHealth || bucketHealth.error) {
+    return (
+      <div className="bg-yellow-500/20 backdrop-blur-sm p-3 rounded-lg mb-4">
+        <p className="text-yellow-300 text-sm">⚠️ Unable to check storage health</p>
+      </div>
+    );
+  }
+
+  const primaryStatus = bucketHealth.buckets?.primary?.status === 'accessible';
+  const backupStatus = bucketHealth.buckets?.backup?.status === 'accessible';
+
+  return (
+    <div className="bg-white/10 backdrop-blur-lg rounded-lg p-4 mb-6">
+      <div className="flex justify-between items-center mb-2">
+        <h3 className="text-lg font-medium text-white">Storage Health</h3>
+        <button 
+          onClick={checkBucketHealth} 
+          disabled={isLoading}
+          className="text-xs bg-gray-600 text-white px-2 py-1 rounded hover:bg-gray-500 disabled:opacity-50"
+        >
+          {isLoading ? '...' : '🔄'}
+        </button>
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="flex items-center space-x-2">
+          <div className={`w-3 h-3 rounded-full ${primaryStatus ? 'bg-green-500' : 'bg-red-500'}`}></div>
+          <span className="text-sm text-gray-300">Primary Storage</span>
+        </div>
+        <div className="flex items-center space-x-2">
+          <div className={`w-3 h-3 rounded-full ${backupStatus ? 'bg-green-500' : 'bg-red-500'}`}></div>
+          <span className="text-sm text-gray-300">Backup Storage</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// New component for verification report
+function VerificationPanel() {
+  const [verificationReport, setVerificationReport] = useState(null);
+  const [isVerifying, setIsVerifying] = useState(false);
+
+  const runVerification = async () => {
+    setIsVerifying(true);
+    try {
+      const res = await fetch(`${API_URL}/verify/both`);
+      const data = await res.json();
+      setVerificationReport(data);
+    } catch (error) {
+      setVerificationReport({ error: 'Verification failed' });
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  return (
+    <div className="bg-white/10 backdrop-blur-lg rounded-lg p-4 mb-6">
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="text-lg font-medium text-white">File Verification</h3>
+        <button
+          onClick={runVerification}
+          disabled={isVerifying}
+          className="bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 disabled:bg-purple-300 transition-colors text-sm"
+        >
+          {isVerifying ? 'Verifying...' : '🔍 Verify All Files'}
+        </button>
+      </div>
+      
+      {verificationReport && !verificationReport.error && (
+        <div className="max-h-40 overflow-y-auto">
+          <div className="space-y-2">
+            {verificationReport.map((file, index) => (
+              <div key={index} className="flex justify-between items-center text-sm">
+                <span className="text-gray-300 truncate flex-1">{file.filename}</span>
+                <div className="flex space-x-2">
+                  <span className={`px-2 py-1 rounded text-xs ${
+                    file.primary === 'ok' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+                  }`}>
+                    P: {file.primary}
+                  </span>
+                  <span className={`px-2 py-1 rounded text-xs ${
+                    file.backup === 'ok' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
+                  }`}>
+                    B: {file.backup}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -149,11 +265,26 @@ export default function App() {
     }
   };
 
-  const download = async (id, filename) => {
+  // Enhanced download function with fallback options
+  const download = async (id, filename, downloadType = 'auto') => {
     showNotification(`Downloading "${filename}"...`);
+    
+    let endpoint;
+    switch (downloadType) {
+      case 'backup':
+        endpoint = `${API_URL}/files/${id}/backup`;
+        break;
+      case 'safe':
+        endpoint = `${API_URL}/files/${id}/safe`;
+        break;
+      default:
+        endpoint = `${API_URL}/files/${id}`;
+    }
+
     try {
-      const res = await fetch(`${API_URL}/files/${id}`);
+      const res = await fetch(endpoint);
       if (!res.ok) throw new Error('Download failed - File Corrupted');
+      
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -163,6 +294,12 @@ export default function App() {
       a.click();
       window.URL.revokeObjectURL(url);
       a.remove();
+
+      // Show which source was used
+      const source = res.headers.get('X-Downloaded-From');
+      if (source) {
+        showNotification(`Downloaded from ${source}`, 'success');
+      }
     } catch (e) {
       showNotification('Download failed - File Corrupted', 'error');
     }
@@ -196,7 +333,7 @@ export default function App() {
   // Show error state if server is not healthy
   if (healthCheckComplete && !serverHealthy) {
     return (
-      <div className="h-screen w-screen flex justify-center items-center bg-gradient-to-br">
+      <div className="h-screen w-screen flex justify-center items-center bg-gradient-to-br from-red-900 to-gray-900" style={{ backgroundColor: '#242424' }}>
         <div className="text-center p-8">
           <div className="mb-6">
             <div className="w-16 h-16 mx-auto bg-red-500 rounded-full flex items-center justify-center">
@@ -221,13 +358,13 @@ export default function App() {
   // Main application UI (only shown when server is healthy)
   return (
     <>
-      <div className="h-screen w-screen flex justify-center items-center bg-gradient-to-br">
+      <div className="min-h-screen w-screen bg-gradient-to-br from-blue-900 to-gray-900 py-8" style={{ backgroundColor: '#242424' }}>
         <Notification message={notification.message} type={notification.type} onClear={() => setNotification({ message: '', type: '' })} />
 
-        <div className="p-4 md:p-8 max-w-4xl mx-auto">
+        <div className="p-4 md:p-8 max-w-6xl mx-auto">
           <header className="text-center mb-8">
             <h1 className="text-3xl md:text-4xl font-bold mb-2 text-white">Secure File System</h1>
-            <p className="text-gray-300">Try uploading, downloading, and managing checksum-verified files.</p>
+            <p className="text-gray-300">Multi-bucket file storage with encryption and verification</p>
           </header>
 
           <div className="mb-8">
@@ -237,6 +374,10 @@ export default function App() {
             </div>
           </div>
 
+          {/* Storage Health Status */}
+          <BucketHealthStatus />
+
+          {/* File Upload Section */}
           <div className="bg-white/10 backdrop-blur-lg shadow-md rounded-lg p-6 mb-8">
             <h2 className="text-xl font-semibold mb-4 text-white">Upload a New File</h2>
             
@@ -250,7 +391,7 @@ export default function App() {
                     : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
                 }`}
               >
-                 Upload File
+                📁 Upload File
               </button>
               <button
                 onClick={() => setUploadMode('text')}
@@ -260,7 +401,7 @@ export default function App() {
                     : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
                 }`}
               >
-                Create Text File
+                📝 Create Text File
               </button>
             </div>
 
@@ -323,23 +464,53 @@ export default function App() {
             )}
           </div>
 
+          {/* Verification Panel */}
+          <VerificationPanel />
+
+          {/* File List */}
           <div className="bg-white/10 backdrop-blur-lg shadow-md rounded-lg p-6">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-white">Stored Files</h2>
+              <h2 className="text-xl font-semibold text-white">Stored Files ({files.length})</h2>
             </div>
-            <ul className="space-y-3">
+            <div className="space-y-3">
               {files.length > 0 ? files.map(f => (
-                <li key={f.id} className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white/20 backdrop-blur-sm p-3 rounded-lg">
-                  <span className="font-medium text-white mb-2 sm:mb-0">{f.filename}</span>
-                  <div className="flex space-x-2">
-                    <button onClick={() => download(f.id, f.filename)} className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 text-xs">Download</button>
-                    <button onClick={() => handleDelete(f.id, f.filename)} disabled={isLoading} className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 disabled:bg-red-300 text-xs">Delete</button>
+                <div key={f.id} className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-white/20 backdrop-blur-sm p-4 rounded-lg">
+                  <div className="flex-1 mb-3 lg:mb-0">
+                    <span className="font-medium text-white block">{f.filename}</span>
+                    <span className="text-gray-400 text-xs">ID: {f.id}</span>
                   </div>
-                </li>
+                  <div className="flex flex-wrap gap-2">
+                    <button 
+                      onClick={() => download(f.id, f.filename, 'auto')} 
+                      className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 text-xs"
+                    >
+                      📥 Download
+                    </button>
+                    <button 
+                      onClick={() => download(f.id, f.filename, 'safe')} 
+                      className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 text-xs"
+                    >
+                      🔒 Safe Download
+                    </button>
+                    <button 
+                      onClick={() => download(f.id, f.filename, 'backup')} 
+                      className="bg-purple-500 text-white px-3 py-1 rounded hover:bg-purple-600 text-xs"
+                    >
+                      💾 Backup
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(f.id, f.filename)} 
+                      disabled={isLoading} 
+                      className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 disabled:bg-red-300 text-xs"
+                    >
+                      🗑️ Delete
+                    </button>
+                  </div>
+                </div>
               )) : (
-                <p className="text-gray-400 text-center py-4">No files have been uploaded yet.</p>
+                <p className="text-gray-400 text-center py-8">No files have been uploaded yet.</p>
               )}
-            </ul>
+            </div>
           </div>
         </div>
       </div>
