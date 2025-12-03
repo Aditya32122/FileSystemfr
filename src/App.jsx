@@ -46,128 +46,62 @@ function ServerLoader() {
   );
 }
 
-// New component for bucket health status
-function BucketHealthStatus() {
-  const [bucketHealth, setBucketHealth] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const checkBucketHealth = async () => {
-    setIsLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/health/buckets`);
-      const data = await res.json();
-      setBucketHealth(data);
-    } catch (error) {
-      setBucketHealth({ error: 'Failed to check bucket health' });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    checkBucketHealth();
-  }, []);
-
-  if (!bucketHealth || bucketHealth.error) {
-    return (
-      <div className="bg-gray-800/60 backdrop-blur-sm p-3 rounded-lg mb-4">
-        <p className="text-gray-400 text-sm">Unable to check storage health</p>
-      </div>
-    );
-  }
-
-  const primaryStatus = bucketHealth.buckets?.primary?.status === 'accessible';
-  const backupStatus = bucketHealth.buckets?.backup?.status === 'accessible';
-
-  return (
-    <div className="bg-gray-800/60 backdrop-blur-lg rounded-lg p-4 mb-6">
-      <div className="flex justify-between items-center mb-2">
-        <h3 className="text-lg font-medium text-white">Storage Health</h3>
-        <button 
-          onClick={checkBucketHealth} 
-          disabled={isLoading}
-          className="text-xs bg-gray-700 text-white px-2 py-1 rounded hover:bg-gray-600 disabled:opacity-50"
-        >
-          {isLoading ? '...' : 'Refresh'}
-        </button>
-      </div>
-      <div className="grid grid-cols-2 gap-4">
-        <div className="flex items-center space-x-2">
-          <div className={`w-3 h-3 rounded-full ${primaryStatus ? 'bg-green-500' : 'bg-red-500'}`}></div>
-          <span className="text-sm text-gray-300">Primary Storage</span>
-        </div>
-        <div className="flex items-center space-x-2">
-          <div className={`w-3 h-3 rounded-full ${backupStatus ? 'bg-green-500' : 'bg-red-500'}`}></div>
-          <span className="text-sm text-gray-300">Backup Storage</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Download dropdown component
-function DownloadDropdown({ file, download }) {
-  const [isOpen, setIsOpen] = useState(false);
-
-  const handleDownload = (downloadType) => {
-    download(file.id, file.filename, downloadType);
-    setIsOpen(false);
-  };
-
-  return (
-    <div className="relative inline-block text-left">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="bg-gray-600 text-white px-3 py-1 rounded hover:bg-gray-500 text-xs"
-      >
-        Download  {isOpen ? '▲' : '▼'}
-      </button>
-
-      {isOpen && (
-        <>
-          <div 
-            className="fixed inset-0 z-100" 
-            onClick={() => setIsOpen(false)}
-          ></div>
-          <div className=" absolute -right-2 mt-2 w-40 rounded-md shadow-lg z-20 bg-gray-700 flex flex-col gap-1 p-1">
-            <button
-              onClick={() => handleDownload('primary')}
-              className="w-full text-left px-4 py-2 text-gray-300 hover:bg-gray-700 text-xs"
-            >
-              Primary Storage
-            </button>
-            <button
-              onClick={() => handleDownload('backup')}
-              className=" w-full text-left px-4 py-2 text-gray-300 hover:bg-gray-700 text-xs"
-            >
-              Backup Storage
-            </button>
-            {/* <button
-              onClick={() => handleDownload('safe')}
-              className="block w-full text-left px-4 py-2 text-gray-300 hover:bg-gray-700 text-xs"
-            >
-              Safe Mode (Auto)
-            </button> */}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
+// Updated File List Item without safe download option
 function FileListItem({ file, download, handleDelete, isLoading: isAppLoading, isVerified }) {
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleDownloadClick = async (downloadType) => {
+    if (isDownloading) return;
+    
+    setIsDownloading(true);
+    
+    // Add 2-second delay for all downloads
+    download(`Preparing download for "${file.filename}"... (2s)`, 'info');
+    
+    setTimeout(() => {
+      download(file.id, file.filename, downloadType);
+      setIsDownloading(false);
+    }, 2000);
+  };
+
   return (
-    <div className="-z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center bg-gray-700/50  p-4 rounded-lg">
+    <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-gray-700/50 p-4 rounded-lg">
       <div className="flex-1 mb-3 lg:mb-0">
         <span className="font-medium text-white block">{file.filename}</span>
-        <span className="text-gray-400 text-xs">ID: {file.id}</span>
+        {/* <span className="text-gray-400 text-xs">ID: {file.id}</span> */}
       </div>
+      
       <div className="flex items-center space-x-2">
         <div className="flex items-center space-x-2">
           {isVerified && <span className="text-xs text-green-400 flex items-center">✔</span>}
         </div>
-        <DownloadDropdown file={file} download={download} />
-        <button onClick={() => handleDelete(file.id, file.filename)} disabled={isAppLoading} className="bg-red-500/80 text-white px-3 py-1 rounded hover:bg-red-500 disabled:bg-red-500/40 text-xs">Delete</button>
+        
+        {/* Primary Download Button */}
+        <button
+          onClick={() => handleDownloadClick('primary')}
+          disabled={isDownloading || isAppLoading}
+          className="bg-blue-500/80 text-white px-3 py-1 rounded hover:bg-blue-500 disabled:bg-blue-500/40 text-xs"
+        >
+          {isDownloading ? '...' : 'Primary'}
+        </button>
+        
+        {/* Backup Download Button */}
+        <button
+          onClick={() => handleDownloadClick('backup')}
+          disabled={isDownloading || isAppLoading}
+          className="bg-purple-500/80 text-white px-3 py-1 rounded hover:bg-purple-500 disabled:bg-purple-500/40 text-xs"
+        >
+          {isDownloading ? '...' : 'Backup'}
+        </button>
+        
+        {/* Delete Button */}
+        <button 
+          onClick={() => handleDelete(file.id, file.filename)} 
+          disabled={isAppLoading || isDownloading} 
+          className="bg-red-500/80 text-white px-3 py-1 rounded hover:bg-red-500 disabled:bg-red-500/40 text-xs"
+        >
+          Delete
+        </button>
       </div>
     </div>
   );
@@ -188,7 +122,6 @@ export default function App() {
 
   const [isVerifyingAll, setIsVerifyingAll] = useState(false);
   const [isAllVerified, setIsAllVerified] = useState(false);
-
 
   // Health check effect
   useEffect(() => {
@@ -280,37 +213,34 @@ export default function App() {
     }
   };
 
-  // Enhanced download function with fallback options
-  // Enhanced download function with fallback options - FIXED
-const download = async (id, filename, downloadType = 'primary') => {
-  showNotification(`Downloading "${filename}"...`);
-  
-  let endpoint;
-  switch (downloadType) {
-    case 'primary':
-      endpoint = `${API_URL}/files/${id}`;
-      break;
-    case 'backup':
-      endpoint = `${API_URL}/files-backup/${id}`;  // Fixed to match server.js
-      break;
-    case 'safe':
-      // Since safe endpoint doesn't exist in server.js, use primary with fallback logic
-      endpoint = `${API_URL}/files/${id}`;
-      break;
-    default:
-      endpoint = `${API_URL}/files/${id}`;
-  }
+  // Simplified download function without safe mode
+  const download = async (id, filename, downloadType = 'primary') => {
+    // If this is just a notification message, show it and return
+    if (typeof id === 'string' && !filename) {
+      showNotification(id, downloadType || 'info');
+      return;
+    }
 
-  try {
-    const res = await fetch(endpoint);
+    showNotification(`Downloading "${filename}" from ${downloadType} storage...`);
     
-    // If primary fails and we're in safe mode, try backup
-    if (!res.ok && downloadType === 'safe') {
-      showNotification('Primary failed, trying backup...', 'info');
-      const backupRes = await fetch(`${API_URL}/files-backup/${id}`);
-      if (!backupRes.ok) throw new Error('Both primary and backup failed');
+    let endpoint;
+    switch (downloadType) {
+      case 'primary':
+        endpoint = `${API_URL}/files/${id}`;
+        break;
+      case 'backup':
+        endpoint = `${API_URL}/files-backup/${id}`;
+        break;
+      default:
+        endpoint = `${API_URL}/files/${id}`;
+    }
+
+    try {
+      const res = await fetch(endpoint);
       
-      const blob = await backupRes.blob();
+      if (!res.ok) throw new Error('Download failed - File Corrupted');
+      
+      const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -319,31 +249,16 @@ const download = async (id, filename, downloadType = 'primary') => {
       a.click();
       window.URL.revokeObjectURL(url);
       a.remove();
-      
-      showNotification('Downloaded from backup storage', 'success');
-      return;
-    }
-    
-    if (!res.ok) throw new Error('Download failed - File Corrupted');
-    
-    const blob = await res.blob();
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-    a.remove();
 
-    // Show which source was used
-    const source = downloadType === 'backup' ? 'backup storage' : 'primary storage';
-    showNotification(`Downloaded from ${source}`, 'success');
-    
-  } catch (e) {
-    showNotification('Download failed - File Corrupted', 'error');
-  }
-};
+      // Show success message
+      const source = downloadType === 'backup' ? 'backup storage' : 'primary storage';
+      showNotification(`Downloaded from ${source}`, 'success');
+      
+    } catch (e) {
+      showNotification(`Download failed: ${e.message}`, 'error');
+    }
+  };
+
   const handleDelete = async (id, filename) => {
     if (!window.confirm(`Are you sure you want to delete "${filename}"?`)) return;
 
@@ -379,8 +294,6 @@ const download = async (id, filename, downloadType = 'primary') => {
     setIsVerifyingAll(false);
     setIsAllVerified(false);
   }, [files]);
-
-
 
   // Show loader while health check is in progress
   if (!healthCheckComplete) {
@@ -430,9 +343,6 @@ const download = async (id, filename, downloadType = 'primary') => {
               <span className="text-sm">Server Connected</span>
             </div>
           </div>
-
-          {/* Storage Health Status */}
-          <BucketHealthStatus />
 
           {/* File Upload Section */}
           <div className="bg-gray-800/60 backdrop-blur-lg shadow-md rounded-lg p-6 mb-8">
@@ -540,7 +450,14 @@ const download = async (id, filename, downloadType = 'primary') => {
             </div>
             <div className="space-y-3">
               {files.length > 0 ? files.map(f => (
-                <FileListItem key={f.id} file={f} download={download} handleDelete={handleDelete} isLoading={isLoading} isVerified={isAllVerified} />
+                <FileListItem 
+                  key={f.id} 
+                  file={f} 
+                  download={download} 
+                  handleDelete={handleDelete} 
+                  isLoading={isLoading} 
+                  isVerified={isAllVerified} 
+                />
               )) : (
                 <p className="text-gray-400 text-center py-8">No files have been uploaded yet.</p>
               )}
