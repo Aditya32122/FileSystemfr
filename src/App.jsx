@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 
-const API_URL = "http://localhost:3000";
+const API_URL = "https://filesystembk-1.onrender.com";
 
 function Notification({ message, type, onClear }) {
   useEffect(() => {
