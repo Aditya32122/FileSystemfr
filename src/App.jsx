@@ -433,7 +433,7 @@ const download = async (id, filename, downloadType = 'primary') => {
   // Main application UI (only shown when server is healthy)
   return (
     <>
-      <div className="min-h-screen w-screen bg-gradient-to-br from-blue-900 to-gray-900 py-8" style={{ backgroundColor: '#242424' }}>
+      <div className="min-h-screen w-screen bg-gradient-to-brpy-8" style={{ backgroundColor: '#242424' }}>
         <Notification message={notification.message} type={notification.type} onClear={() => setNotification({ message: '', type: '' })} />
 
         <div className="p-4 md:p-8 max-w-6xl mx-auto">
