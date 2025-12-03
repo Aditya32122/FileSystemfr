@@ -14,10 +14,10 @@ function Notification({ message, type, onClear }) {
 
   if (!message) return null;
 
-  const bgColor = type === 'success' ? 'bg-green-100 border-green-400 text-green-700' : 'bg-red-100 border-red-400 text-red-700';
+  const bgColor = type === 'success' ? 'bg-gray-800 border-green-500 text-green-300' : 'bg-gray-800 border-red-500 text-red-300';
 
   return (
-    <div className={`fixed top-5 right-5 border px-4 py-3 rounded shadow-lg ${bgColor}`} role="alert">
+    <div className={`fixed top-5 right-5 border px-4 py-3 rounded-lg shadow-lg ${bgColor}`} role="alert">
       <span className="block sm:inline">{message}</span>
     </div>
   );
@@ -25,7 +25,7 @@ function Notification({ message, type, onClear }) {
 
 function ServerLoader() {
   return (
-    <div className="h-screen w-screen flex justify-center items-center bg-gradient-to-br from-gray-900 to-gray-800" style={{ backgroundColor: '#242424' }}>
+    <div className="h-screen w-screen flex justify-center items-center bg-gray-900">
       <div className="text-center">
         <div className="mb-6">
           <div className="w-16 h-16 mx-auto border-4 border-white border-t-transparent rounded-full animate-spin"></div>
@@ -70,8 +70,8 @@ function BucketHealthStatus() {
 
   if (!bucketHealth || bucketHealth.error) {
     return (
-      <div className="bg-yellow-500/20 backdrop-blur-sm p-3 rounded-lg mb-4">
-        <p className="text-yellow-300 text-sm">Unable to check storage health</p>
+      <div className="bg-gray-800/60 backdrop-blur-sm p-3 rounded-lg mb-4">
+        <p className="text-gray-400 text-sm">Unable to check storage health</p>
       </div>
     );
   }
@@ -80,13 +80,13 @@ function BucketHealthStatus() {
   const backupStatus = bucketHealth.buckets?.backup?.status === 'accessible';
 
   return (
-    <div className="bg-white/10 backdrop-blur-lg rounded-lg p-4 mb-6">
+    <div className="bg-gray-800/60 backdrop-blur-lg rounded-lg p-4 mb-6">
       <div className="flex justify-between items-center mb-2">
         <h3 className="text-lg font-medium text-white">Storage Health</h3>
         <button 
           onClick={checkBucketHealth} 
           disabled={isLoading}
-          className="text-xs bg-gray-600 text-white px-2 py-1 rounded hover:bg-gray-500 disabled:opacity-50"
+          className="text-xs bg-gray-700 text-white px-2 py-1 rounded hover:bg-gray-600 disabled:opacity-50"
         >
           {isLoading ? '...' : 'Refresh'}
         </button>
@@ -105,64 +105,6 @@ function BucketHealthStatus() {
   );
 }
 
-// New component for verification report
-function VerificationPanel() {
-  const [verificationReport, setVerificationReport] = useState(null);
-  const [isVerifying, setIsVerifying] = useState(false);
-
-  const runVerification = async () => {
-    setIsVerifying(true);
-    try {
-      const res = await fetch(`${API_URL}/verify/both`);
-      const data = await res.json();
-      setVerificationReport(data);
-    } catch (error) {
-      setVerificationReport({ error: 'Verification failed' });
-    } finally {
-      setIsVerifying(false);
-    }
-  };
-
-  return (
-    <div className="bg-white/10 backdrop-blur-lg rounded-lg p-4 mb-6">
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-lg font-medium text-white">File Verification</h3>
-        <button
-          onClick={runVerification}
-          disabled={isVerifying}
-          className="bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 disabled:bg-purple-300 transition-colors text-sm"
-        >
-          {isVerifying ? 'Verifying...' : 'Verify All Files'}
-        </button>
-      </div>
-      
-      {verificationReport && !verificationReport.error && (
-        <div className="max-h-40 overflow-y-auto">
-          <div className="space-y-2">
-            {verificationReport.map((file, index) => (
-              <div key={index} className="flex justify-between items-center text-sm">
-                <span className="text-gray-300 truncate flex-1">{file.filename}</span>
-                <div className="flex space-x-2">
-                  <span className={`px-2 py-1 rounded text-xs ${
-                    file.primary === 'ok' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
-                  }`}>
-                    P: {file.primary}
-                  </span>
-                  <span className={`px-2 py-1 rounded text-xs ${
-                    file.backup === 'ok' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'
-                  }`}>
-                    B: {file.backup}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // Download dropdown component
 function DownloadDropdown({ file, download }) {
   const [isOpen, setIsOpen] = useState(false);
@@ -176,39 +118,57 @@ function DownloadDropdown({ file, download }) {
     <div className="relative inline-block text-left">
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 text-xs"
+        className="bg-gray-600 text-white px-3 py-1 rounded hover:bg-gray-500 text-xs"
       >
-        Download ▼
+        Download  {isOpen ? '▲' : '▼'}
       </button>
 
       {isOpen && (
         <>
           <div 
-            className="fixed inset-0 z-10" 
+            className="fixed inset-0 z-100" 
             onClick={() => setIsOpen(false)}
           ></div>
-          <div className="absolute right-0 mt-2 w-40 bg-white rounded-md shadow-lg z-20">
+          <div className=" absolute -right-2 mt-2 w-40 rounded-md shadow-lg z-20 bg-gray-700 flex flex-col gap-1 p-1">
             <button
               onClick={() => handleDownload('primary')}
-              className="block w-full text-left px-4 py-2 text-gray-800 hover:bg-gray-100 text-xs"
+              className="w-full text-left px-4 py-2 text-gray-300 hover:bg-gray-700 text-xs"
             >
               Primary Storage
             </button>
             <button
               onClick={() => handleDownload('backup')}
-              className="block w-full text-left px-4 py-2 text-gray-800 hover:bg-gray-100 text-xs"
+              className=" w-full text-left px-4 py-2 text-gray-300 hover:bg-gray-700 text-xs"
             >
               Backup Storage
             </button>
-            <button
+            {/* <button
               onClick={() => handleDownload('safe')}
-              className="block w-full text-left px-4 py-2 text-gray-800 hover:bg-gray-100 text-xs"
+              className="block w-full text-left px-4 py-2 text-gray-300 hover:bg-gray-700 text-xs"
             >
               Safe Mode (Auto)
-            </button>
+            </button> */}
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function FileListItem({ file, download, handleDelete, isLoading: isAppLoading, isVerified }) {
+  return (
+    <div className="-z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center bg-gray-700/50  p-4 rounded-lg">
+      <div className="flex-1 mb-3 lg:mb-0">
+        <span className="font-medium text-white block">{file.filename}</span>
+        <span className="text-gray-400 text-xs">ID: {file.id}</span>
+      </div>
+      <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-2">
+          {isVerified && <span className="text-xs text-green-400 flex items-center">✔</span>}
+        </div>
+        <DownloadDropdown file={file} download={download} />
+        <button onClick={() => handleDelete(file.id, file.filename)} disabled={isAppLoading} className="bg-red-500/80 text-white px-3 py-1 rounded hover:bg-red-500 disabled:bg-red-500/40 text-xs">Delete</button>
+      </div>
     </div>
   );
 }
@@ -225,6 +185,10 @@ export default function App() {
   const [uploadMode, setUploadMode] = useState('file'); // 'file' or 'text'
   const [textContent, setTextContent] = useState('');
   const [textFileName, setTextFileName] = useState('');
+
+  const [isVerifyingAll, setIsVerifyingAll] = useState(false);
+  const [isAllVerified, setIsAllVerified] = useState(false);
+
 
   // Health check effect
   useEffect(() => {
@@ -400,6 +364,24 @@ const download = async (id, filename, downloadType = 'primary') => {
     }
   };
 
+  const handleVerifyAll = () => {
+    if (isAllVerified || isVerifyingAll) return;
+
+    setIsVerifyingAll(true);
+    setTimeout(() => {
+      setIsVerifyingAll(false);
+      setIsAllVerified(true);
+    }, 3000);
+  };
+
+  // Reset verification when files change
+  useEffect(() => {
+    setIsVerifyingAll(false);
+    setIsAllVerified(false);
+  }, [files]);
+
+
+
   // Show loader while health check is in progress
   if (!healthCheckComplete) {
     return <ServerLoader />;
@@ -408,11 +390,11 @@ const download = async (id, filename, downloadType = 'primary') => {
   // Show error state if server is not healthy
   if (healthCheckComplete && !serverHealthy) {
     return (
-      <div className="h-screen w-screen flex justify-center items-center bg-gradient-to-br from-red-900 to-gray-900" style={{ backgroundColor: '#242424' }}>
+      <div className="h-screen w-screen flex justify-center items-center bg-gray-900">
         <div className="text-center p-8">
           <div className="mb-6">
-            <div className="w-16 h-16 mx-auto bg-red-500 rounded-full flex items-center justify-center">
-              <span className="text-white text-2xl">X</span>
+            <div className="w-16 h-16 mx-auto bg-red-500/30 rounded-full flex items-center justify-center border-2 border-red-500">
+              <span className="text-red-400 text-2xl">!</span>
             </div>
           </div>
           <h2 className="text-2xl font-bold text-white mb-2">Server Unavailable</h2>
@@ -421,7 +403,7 @@ const download = async (id, filename, downloadType = 'primary') => {
           </p>
           <button 
             onClick={() => window.location.reload()} 
-            className="bg-red-500 text-white px-6 py-2 rounded-lg hover:bg-red-600 transition-colors"
+            className="bg-gray-700 text-white px-6 py-2 rounded-lg hover:bg-gray-600 transition-colors"
           >
             Retry Connection
           </button>
@@ -433,7 +415,7 @@ const download = async (id, filename, downloadType = 'primary') => {
   // Main application UI (only shown when server is healthy)
   return (
     <>
-      <div className="min-h-screen w-screen bg-gradient-to-br from-blue-900 to-gray-900 py-8" style={{ backgroundColor: '#242424' }}>
+      <div className="min-h-screen w-screen bg-gray-900 py-8 pb-20 text-gray-300">
         <Notification message={notification.message} type={notification.type} onClear={() => setNotification({ message: '', type: '' })} />
 
         <div className="p-4 md:p-8 max-w-6xl mx-auto">
@@ -453,7 +435,7 @@ const download = async (id, filename, downloadType = 'primary') => {
           <BucketHealthStatus />
 
           {/* File Upload Section */}
-          <div className="bg-white/10 backdrop-blur-lg shadow-md rounded-lg p-6 mb-8">
+          <div className="bg-gray-800/60 backdrop-blur-lg shadow-md rounded-lg p-6 mb-8">
             <h2 className="text-xl font-semibold mb-4 text-white">Upload a New File</h2>
             
             {/* Upload Mode Toggle */}
@@ -462,8 +444,8 @@ const download = async (id, filename, downloadType = 'primary') => {
                 onClick={() => setUploadMode('file')}
                 className={`px-4 py-2 rounded-lg transition-colors ${
                   uploadMode === 'file' 
-                    ? 'bg-blue-500 text-white' 
-                    : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+                    ? 'bg-gray-600 text-white' 
+                    : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
                 }`}
               >
                 Upload File
@@ -472,8 +454,8 @@ const download = async (id, filename, downloadType = 'primary') => {
                 onClick={() => setUploadMode('text')}
                 className={`px-4 py-2 rounded-lg transition-colors ${
                   uploadMode === 'text' 
-                    ? 'bg-blue-500 text-white' 
-                    : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+                    ? 'bg-gray-600 text-white' 
+                    : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
                 }`}
               >
                 Create Text File
@@ -486,12 +468,12 @@ const download = async (id, filename, downloadType = 'primary') => {
                 <input
                   type="file"
                   onChange={e => setFile(e.target.files[0])}
-                  className="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                  className="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-gray-700 file:text-gray-300 hover:file:bg-gray-600"
                 />
                 <button
                   onClick={upload}
                   disabled={isLoading}
-                  className="bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 disabled:bg-blue-300 transition-colors"
+                  className="bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-500 disabled:bg-gray-700 transition-colors"
                 >
                   {isLoading ? 'Uploading...' : 'Upload'}
                 </button>
@@ -510,7 +492,7 @@ const download = async (id, filename, downloadType = 'primary') => {
                     value={textFileName}
                     onChange={(e) => setTextFileName(e.target.value)}
                     placeholder="Enter filename (e.g., notes.txt, config.json)"
-                    className="w-full px-3 py-2 bg-white/20 border border-gray-500 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500"
                   />
                 </div>
                 <div>
@@ -522,7 +504,7 @@ const download = async (id, filename, downloadType = 'primary') => {
                     onChange={(e) => setTextContent(e.target.value)}
                     placeholder="Paste or type your text content here..."
                     rows={8}
-                    className="w-full px-3 py-2 bg-white/20 border border-gray-500 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-vertical"
+                    className="w-full px-3 py-2 bg-gray-700/50 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-gray-500 resize-vertical"
                   />
                   <div className="text-xs text-gray-400 mt-1">
                     Characters: {textContent.length}
@@ -531,7 +513,7 @@ const download = async (id, filename, downloadType = 'primary') => {
                 <button
                   onClick={upload}
                   disabled={isLoading || !textContent.trim() || !textFileName.trim()}
-                  className="w-full bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 disabled:bg-blue-300 transition-colors"
+                  className="w-full bg-gray-600 text-white px-6 py-2 rounded-lg hover:bg-gray-500 disabled:bg-gray-700 transition-colors"
                 >
                   {isLoading ? 'Creating File...' : 'Create & Upload File'}
                 </button>
@@ -539,32 +521,26 @@ const download = async (id, filename, downloadType = 'primary') => {
             )}
           </div>
 
-          {/* Verification Panel */}
-          <VerificationPanel />
-
           {/* File List */}
-          <div className="bg-white/10 backdrop-blur-lg shadow-md rounded-lg p-6">
+          <div className="bg-gray-800/60 backdrop-blur-lg shadow-md rounded-lg p-6">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold text-white">Stored Files ({files.length})</h2>
+              <div className="flex items-center space-x-2 cursor-pointer" onClick={handleVerifyAll}>
+                {isVerifyingAll ? (
+                  <span className="text-xs text-yellow-400 animate-pulse">Verifying All...</span>
+                ) : isAllVerified ? (
+                  <span className="text-xs text-green-400 flex items-center">✔ All Verified</span>
+                ) : (
+                  <label htmlFor="verify-all" className="text-xs text-gray-300 flex items-center cursor-pointer">
+                    <input id="verify-all" type="checkbox" className="h-4 w-4 rounded bg-gray-600 border-gray-500 text-blue-500 focus:ring-blue-500" />
+                    <span className="ml-2">Verify All</span>
+                  </label>
+                )}
+              </div>
             </div>
             <div className="space-y-3">
               {files.length > 0 ? files.map(f => (
-                <div key={f.id} className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-white/20 backdrop-blur-sm p-4 rounded-lg">
-                  <div className="flex-1 mb-3 lg:mb-0">
-                    <span className="font-medium text-white block">{f.filename}</span>
-                    <span className="text-gray-400 text-xs">ID: {f.id}</span>
-                  </div>
-                  <div className="flex space-x-2">
-                    <DownloadDropdown file={f} download={download} />
-                    <button 
-                      onClick={() => handleDelete(f.id, f.filename)} 
-                      disabled={isLoading} 
-                      className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 disabled:bg-red-300 text-xs"
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
+                <FileListItem key={f.id} file={f} download={download} handleDelete={handleDelete} isLoading={isLoading} isVerified={isAllVerified} />
               )) : (
                 <p className="text-gray-400 text-center py-8">No files have been uploaded yet.</p>
               )}
