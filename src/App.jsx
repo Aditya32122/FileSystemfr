@@ -46,64 +46,186 @@ function ServerLoader() {
   );
 }
 
-// Updated File List Item without safe download option
-function FileListItem({ file, download, handleDelete, isLoading: isAppLoading, isVerified }) {
-  const [isDownloading, setIsDownloading] = useState(false);
+// Download Modal Component
+function DownloadModal({ isOpen, onClose, file, downloadType, onDownload }) {
+  const [safeDownload, setSafeDownload] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanProgress, setScanProgress] = useState(0);
 
-  const handleDownloadClick = async (downloadType) => {
-    if (isDownloading) return;
-    
-    setIsDownloading(true);
-    
-    // Add 2-second delay for all downloads
-    download(`Preparing download for "${file.filename}"... (2s)`, 'info');
-    
-    setTimeout(() => {
-      download(file.id, file.filename, downloadType);
-      setIsDownloading(false);
-    }, 2000);
+  useEffect(() => {
+    if (isOpen) {
+      setSafeDownload(false);
+      setIsScanning(false);
+      setScanProgress(0);
+    }
+  }, [isOpen]);
+
+  const handleDownload = async () => {
+    if (safeDownload) {
+      setIsScanning(true);
+      setScanProgress(0);
+      
+      // Simulate scanning progress
+      const scanInterval = setInterval(() => {
+        setScanProgress(prev => {
+          if (prev >= 100) {
+            clearInterval(scanInterval);
+            return 100;
+          }
+          return prev + 10;
+        });
+      }, 200);
+
+      // Wait for scan to complete (2 seconds)
+      setTimeout(() => {
+        clearInterval(scanInterval);
+        setIsScanning(false);
+        onDownload(file.id, file.filename, downloadType);
+        onClose();
+      }, 2000);
+    } else {
+      onDownload(file.id, file.filename, downloadType);
+      onClose();
+    }
+  };
+
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+      <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+        <h3 className="text-lg font-semibold text-white mb-4">
+          Download File
+        </h3>
+        
+        <div className="mb-4">
+          <p className="text-gray-300 text-sm mb-2">
+            File: <span className="text-white font-medium">{file?.filename}</span>
+          </p>
+          <p className="text-gray-300 text-sm">
+            Source: <span className="text-white font-medium capitalize">{downloadType}</span> Storage
+          </p>
+        </div>
+
+        {/* Safe Download Option */}
+        <div className="mb-6">
+          <label className="flex items-center space-x-3 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={safeDownload}
+              onChange={(e) => setSafeDownload(e.target.checked)}
+              className="h-4 w-4 rounded bg-gray-600 border-gray-500 text-blue-500 focus:ring-blue-500"
+            />
+            <div className="flex-1">
+              <span className="text-white text-sm font-medium">Safe Download</span>
+              <p className="text-gray-400 text-xs mt-1">
+                Scan file for integrity before download
+              </p>
+            </div>
+          </label>
+        </div>
+
+        {/* Scanning Progress */}
+        {isScanning && (
+          <div className="mb-6">
+            <div className="flex items-center space-x-2 mb-2">
+              <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+              <span className="text-blue-400 text-sm">Scanning file...</span>
+            </div>
+            <div className="w-full bg-gray-700 rounded-full h-2">
+              <div 
+                className="bg-blue-500 h-2 rounded-full transition-all duration-200"
+                style={{ width: `${scanProgress}%` }}
+              ></div>
+            </div>
+            <p className="text-gray-400 text-xs mt-1">{scanProgress}% complete</p>
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="flex space-x-3">
+          <button
+            onClick={onClose}
+            disabled={isScanning}
+            className="flex-1 bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-600 disabled:bg-gray-700/50 disabled:cursor-not-allowed transition-colors text-sm"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleDownload}
+            disabled={isScanning}
+            className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-500 disabled:bg-blue-600/50 disabled:cursor-not-allowed transition-colors text-sm"
+          >
+            {isScanning ? 'Scanning...' : 'Download'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Updated File List Item
+function FileListItem({ file, download, handleDelete, isLoading: isAppLoading, isVerified }) {
+  const [downloadModal, setDownloadModal] = useState({ isOpen: false, type: null });
+
+  const handleDownloadClick = (downloadType) => {
+    setDownloadModal({ isOpen: true, type: downloadType });
+  };
+
+  const closeModal = () => {
+    setDownloadModal({ isOpen: false, type: null });
   };
 
   return (
-    <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-gray-700/50 p-4 rounded-lg">
-      <div className="flex-1 mb-3 lg:mb-0">
-        <span className="font-medium text-white block">{file.filename}</span>
-        {/* <span className="text-gray-400 text-xs">ID: {file.id}</span> */}
-      </div>
-      
-      <div className="flex items-center space-x-2">
-        <div className="flex items-center space-x-2">
-          {isVerified && <span className="text-xs text-green-400 flex items-center">✔</span>}
+    <>
+      <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center bg-gray-700/50 p-4 rounded-lg">
+        <div className="flex-1 mb-3 lg:mb-0">
+          <span className="font-medium text-white block">{file.filename}</span>
         </div>
         
-        {/* Primary Download Button */}
-        <button
-          onClick={() => handleDownloadClick('primary')}
-          disabled={isDownloading || isAppLoading}
-          className="bg-blue-500/80 text-white px-3 py-1 rounded hover:bg-blue-500 disabled:bg-blue-500/40 text-xs"
-        >
-          {isDownloading ? '...' : 'Primary'}
-        </button>
-        
-        {/* Backup Download Button */}
-        <button
-          onClick={() => handleDownloadClick('backup')}
-          disabled={isDownloading || isAppLoading}
-          className="bg-purple-500/80 text-white px-3 py-1 rounded hover:bg-purple-500 disabled:bg-purple-500/40 text-xs"
-        >
-          {isDownloading ? '...' : 'Backup'}
-        </button>
-        
-        {/* Delete Button */}
-        <button 
-          onClick={() => handleDelete(file.id, file.filename)} 
-          disabled={isAppLoading || isDownloading} 
-          className="bg-red-500/80 text-white px-3 py-1 rounded hover:bg-red-500 disabled:bg-red-500/40 text-xs"
-        >
-          Delete
-        </button>
+        <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2">
+            {isVerified && <span className="text-xs text-green-400 flex items-center">✔</span>}
+          </div>
+          
+          {/* Primary Download Button */}
+          <button
+            onClick={() => handleDownloadClick('primary')}
+            disabled={isAppLoading}
+            className="bg-blue-500/80 text-white px-3 py-1 rounded hover:bg-blue-500 disabled:bg-blue-500/40 text-xs"
+          >
+            Primary
+          </button>
+          
+          {/* Backup Download Button */}
+          <button
+            onClick={() => handleDownloadClick('backup')}
+            disabled={isAppLoading}
+            className="bg-purple-500/80 text-white px-3 py-1 rounded hover:bg-purple-500 disabled:bg-purple-500/40 text-xs"
+          >
+            Backup
+          </button>
+          
+          {/* Delete Button */}
+          <button 
+            onClick={() => handleDelete(file.id, file.filename)} 
+            disabled={isAppLoading} 
+            className="bg-red-500/80 text-white px-3 py-1 rounded hover:bg-red-500 disabled:bg-red-500/40 text-xs"
+          >
+            Delete
+          </button>
+        </div>
       </div>
-    </div>
+
+      {/* Download Modal */}
+      <DownloadModal
+        isOpen={downloadModal.isOpen}
+        onClose={closeModal}
+        file={file}
+        downloadType={downloadModal.type}
+        onDownload={download}
+      />
+    </>
   );
 }
 
@@ -213,14 +335,8 @@ export default function App() {
     }
   };
 
-  // Simplified download function without safe mode
+  // Download function
   const download = async (id, filename, downloadType = 'primary') => {
-    // If this is just a notification message, show it and return
-    if (typeof id === 'string' && !filename) {
-      showNotification(id, downloadType || 'info');
-      return;
-    }
-
     showNotification(`Downloading "${filename}" from ${downloadType} storage...`);
     
     let endpoint;
