@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 
-const API_URL = "https://filesystembk-1.onrender.com";
+const API_URL = "http://localhost:3000";
 
 function Notification({ message, type, onClear }) {
   useEffect(() => {
@@ -71,7 +71,7 @@ function BucketHealthStatus() {
   if (!bucketHealth || bucketHealth.error) {
     return (
       <div className="bg-yellow-500/20 backdrop-blur-sm p-3 rounded-lg mb-4">
-        <p className="text-yellow-300 text-sm">⚠️ Unable to check storage health</p>
+        <p className="text-yellow-300 text-sm">Unable to check storage health</p>
       </div>
     );
   }
@@ -88,7 +88,7 @@ function BucketHealthStatus() {
           disabled={isLoading}
           className="text-xs bg-gray-600 text-white px-2 py-1 rounded hover:bg-gray-500 disabled:opacity-50"
         >
-          {isLoading ? '...' : '🔄'}
+          {isLoading ? '...' : 'Refresh'}
         </button>
       </div>
       <div className="grid grid-cols-2 gap-4">
@@ -132,7 +132,7 @@ function VerificationPanel() {
           disabled={isVerifying}
           className="bg-purple-500 text-white px-4 py-2 rounded-lg hover:bg-purple-600 disabled:bg-purple-300 transition-colors text-sm"
         >
-          {isVerifying ? 'Verifying...' : '🔍 Verify All Files'}
+          {isVerifying ? 'Verifying...' : 'Verify All Files'}
         </button>
       </div>
       
@@ -158,6 +158,56 @@ function VerificationPanel() {
             ))}
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+// Download dropdown component
+function DownloadDropdown({ file, download }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const handleDownload = (downloadType) => {
+    download(file.id, file.filename, downloadType);
+    setIsOpen(false);
+  };
+
+  return (
+    <div className="relative inline-block text-left">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 text-xs"
+      >
+        Download ▼
+      </button>
+
+      {isOpen && (
+        <>
+          <div 
+            className="fixed inset-0 z-10" 
+            onClick={() => setIsOpen(false)}
+          ></div>
+          <div className="absolute right-0 mt-2 w-40 bg-white rounded-md shadow-lg z-20">
+            <button
+              onClick={() => handleDownload('primary')}
+              className="block w-full text-left px-4 py-2 text-gray-800 hover:bg-gray-100 text-xs"
+            >
+              Primary Storage
+            </button>
+            <button
+              onClick={() => handleDownload('backup')}
+              className="block w-full text-left px-4 py-2 text-gray-800 hover:bg-gray-100 text-xs"
+            >
+              Backup Storage
+            </button>
+            <button
+              onClick={() => handleDownload('safe')}
+              className="block w-full text-left px-4 py-2 text-gray-800 hover:bg-gray-100 text-xs"
+            >
+              Safe Mode (Auto)
+            </button>
+          </div>
+        </>
       )}
     </div>
   );
@@ -249,7 +299,8 @@ export default function App() {
         // Clear form
         if (uploadMode === 'file') {
           setFile(null);
-          document.querySelector('input[type="file"]').value = '';
+          const fileInput = document.querySelector('input[type="file"]');
+          if (fileInput) fileInput.value = '';
         } else {
           setTextContent('');
           setTextFileName('');
@@ -266,26 +317,36 @@ export default function App() {
   };
 
   // Enhanced download function with fallback options
-  const download = async (id, filename, downloadType = 'auto') => {
-    showNotification(`Downloading "${filename}"...`);
-    
-    let endpoint;
-    switch (downloadType) {
-      case 'backup':
-        endpoint = `${API_URL}/files/${id}/backup`;
-        break;
-      case 'safe':
-        endpoint = `${API_URL}/files/${id}/safe`;
-        break;
-      default:
-        endpoint = `${API_URL}/files/${id}`;
-    }
+  // Enhanced download function with fallback options - FIXED
+const download = async (id, filename, downloadType = 'primary') => {
+  showNotification(`Downloading "${filename}"...`);
+  
+  let endpoint;
+  switch (downloadType) {
+    case 'primary':
+      endpoint = `${API_URL}/files/${id}`;
+      break;
+    case 'backup':
+      endpoint = `${API_URL}/files-backup/${id}`;  // Fixed to match server.js
+      break;
+    case 'safe':
+      // Since safe endpoint doesn't exist in server.js, use primary with fallback logic
+      endpoint = `${API_URL}/files/${id}`;
+      break;
+    default:
+      endpoint = `${API_URL}/files/${id}`;
+  }
 
-    try {
-      const res = await fetch(endpoint);
-      if (!res.ok) throw new Error('Download failed - File Corrupted');
+  try {
+    const res = await fetch(endpoint);
+    
+    // If primary fails and we're in safe mode, try backup
+    if (!res.ok && downloadType === 'safe') {
+      showNotification('Primary failed, trying backup...', 'info');
+      const backupRes = await fetch(`${API_URL}/files-backup/${id}`);
+      if (!backupRes.ok) throw new Error('Both primary and backup failed');
       
-      const blob = await res.blob();
+      const blob = await backupRes.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -294,17 +355,31 @@ export default function App() {
       a.click();
       window.URL.revokeObjectURL(url);
       a.remove();
-
-      // Show which source was used
-      const source = res.headers.get('X-Downloaded-From');
-      if (source) {
-        showNotification(`Downloaded from ${source}`, 'success');
-      }
-    } catch (e) {
-      showNotification('Download failed - File Corrupted', 'error');
+      
+      showNotification('Downloaded from backup storage', 'success');
+      return;
     }
-  };
+    
+    if (!res.ok) throw new Error('Download failed - File Corrupted');
+    
+    const blob = await res.blob();
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    window.URL.revokeObjectURL(url);
+    a.remove();
 
+    // Show which source was used
+    const source = downloadType === 'backup' ? 'backup storage' : 'primary storage';
+    showNotification(`Downloaded from ${source}`, 'success');
+    
+  } catch (e) {
+    showNotification('Download failed - File Corrupted', 'error');
+  }
+};
   const handleDelete = async (id, filename) => {
     if (!window.confirm(`Are you sure you want to delete "${filename}"?`)) return;
 
@@ -337,7 +412,7 @@ export default function App() {
         <div className="text-center p-8">
           <div className="mb-6">
             <div className="w-16 h-16 mx-auto bg-red-500 rounded-full flex items-center justify-center">
-              <span className="text-white text-2xl">✕</span>
+              <span className="text-white text-2xl">X</span>
             </div>
           </div>
           <h2 className="text-2xl font-bold text-white mb-2">Server Unavailable</h2>
@@ -391,7 +466,7 @@ export default function App() {
                     : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
                 }`}
               >
-                📁 Upload File
+                Upload File
               </button>
               <button
                 onClick={() => setUploadMode('text')}
@@ -401,7 +476,7 @@ export default function App() {
                     : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
                 }`}
               >
-                📝 Create Text File
+                Create Text File
               </button>
             </div>
 
@@ -479,31 +554,14 @@ export default function App() {
                     <span className="font-medium text-white block">{f.filename}</span>
                     <span className="text-gray-400 text-xs">ID: {f.id}</span>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    <button 
-                      onClick={() => download(f.id, f.filename, 'auto')} 
-                      className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600 text-xs"
-                    >
-                      📥 Download
-                    </button>
-                    <button 
-                      onClick={() => download(f.id, f.filename, 'safe')} 
-                      className="bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 text-xs"
-                    >
-                      🔒 Safe Download
-                    </button>
-                    <button 
-                      onClick={() => download(f.id, f.filename, 'backup')} 
-                      className="bg-purple-500 text-white px-3 py-1 rounded hover:bg-purple-600 text-xs"
-                    >
-                      💾 Backup
-                    </button>
+                  <div className="flex space-x-2">
+                    <DownloadDropdown file={f} download={download} />
                     <button 
                       onClick={() => handleDelete(f.id, f.filename)} 
                       disabled={isLoading} 
                       className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 disabled:bg-red-300 text-xs"
                     >
-                      🗑️ Delete
+                      Delete
                     </button>
                   </div>
                 </div>
