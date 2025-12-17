@@ -1,3 +1,27 @@
+// export default function ServerLoader() {
+//   return (
+//     <div className="h-screen w-screen flex justify-center items-center bg-gray-900">
+//       <div className="text-center">
+//         <div className="mb-6">
+//           <div className="w-16 h-16 mx-auto border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+//         </div>
+//         <h2 className="text-2xl font-bold text-white mb-2">Starting Server</h2>
+//         <p className="text-gray-300 max-w-md">
+//           Please wait while we connect to the server. This might take up to 50 seconds for the first time.
+//         </p>
+//         <div className="mt-4">
+//           <div className="flex justify-center space-x-1">
+//             <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+//             <div className="w-2 h-2 bg-white rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+//             <div className="w-2 h-2 bg-white rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
+//           </div>
+//         </div>
+//       </div>
+//     </div>
+//   );
+// }
+
+
 import { useState, useEffect } from "react";
 
 const API_URL = "https://filesystembk-1.onrender.com";
@@ -17,12 +41,11 @@ function Notification({ message, type, onClear }) {
   const bgColor = type === 'success' ? 'bg-gray-800 border-green-500 text-green-300' : 'bg-gray-800 border-red-500 text-red-300';
 
   return (
-    <div className={`fixed bottom-5 right-5 border px-4 py-3 rounded-lg shadow-lg ${bgColor} z-[100]`} role="alert">
+    <div className={`fixed top-5 right-5 border px-4 py-3 rounded-lg shadow-lg ${bgColor}`} role="alert">
       <span className="block sm:inline">{message}</span>
     </div>
   );
 }
-
 
 function ServerLoader() {
   return (
@@ -48,7 +71,7 @@ function ServerLoader() {
 }
 
 // Download Modal Component
-function DownloadModal({ isOpen, onClose, file, onDownload }) {
+function DownloadModal({ isOpen, onClose, file, downloadType, onDownload }) {
   const [safeDownload, setSafeDownload] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState(0);
@@ -81,11 +104,11 @@ function DownloadModal({ isOpen, onClose, file, onDownload }) {
       setTimeout(() => {
         clearInterval(scanInterval);
         setIsScanning(false);
-        onDownload(file.id, file.filename, true); // true indicates safe download
+        onDownload(file.id, file.filename, downloadType);
         onClose();
       }, 2000);
     } else {
-      onDownload(file.id, file.filename, false); // false indicates regular download
+      onDownload(file.id, file.filename, downloadType);
       onClose();
     }
   };
@@ -103,6 +126,9 @@ function DownloadModal({ isOpen, onClose, file, onDownload }) {
           <p className="text-gray-300 text-sm mb-2">
             File: <span className="text-white font-medium">{file?.filename}</span>
           </p>
+          <p className="text-gray-300 text-sm">
+            Source: <span className="text-white font-medium capitalize">{downloadType}</span> Storage
+          </p>
         </div>
 
         {/* Safe Download Option */}
@@ -117,7 +143,7 @@ function DownloadModal({ isOpen, onClose, file, onDownload }) {
             <div className="flex-1">
               <span className="text-white text-sm font-medium">Safe Download</span>
               <p className="text-gray-400 text-xs mt-1">
-                Scan file for integrity and auto-fallback to backup if primary fails
+                Scan file for integrity before download
               </p>
             </div>
           </label>
@@ -164,14 +190,14 @@ function DownloadModal({ isOpen, onClose, file, onDownload }) {
 
 // Updated File List Item
 function FileListItem({ file, download, handleDelete, isLoading: isAppLoading, isVerified }) {
-  const [downloadModal, setDownloadModal] = useState(false);
+  const [downloadModal, setDownloadModal] = useState({ isOpen: false, type: null });
 
-  const handleDownloadClick = () => {
-    setDownloadModal(true);
+  const handleDownloadClick = (downloadType) => {
+    setDownloadModal({ isOpen: true, type: downloadType });
   };
 
   const closeModal = () => {
-    setDownloadModal(false);
+    setDownloadModal({ isOpen: false, type: null });
   };
 
   return (
@@ -186,13 +212,22 @@ function FileListItem({ file, download, handleDelete, isLoading: isAppLoading, i
             {isVerified && <span className="text-xs text-green-400 flex items-center">✔</span>}
           </div>
           
-          {/* Safe Download Button */}
+          {/* Primary Download Button */}
           <button
-            onClick={handleDownloadClick}
+            onClick={() => handleDownloadClick('primary')}
             disabled={isAppLoading}
             className="bg-blue-500/80 text-white px-3 py-1 rounded hover:bg-blue-500 disabled:bg-blue-500/40 text-xs"
           >
-            Safe Download
+            Primary
+          </button>
+          
+          {/* Backup Download Button */}
+          <button
+            onClick={() => handleDownloadClick('backup')}
+            disabled={isAppLoading}
+            className="bg-purple-500/80 text-white px-3 py-1 rounded hover:bg-purple-500 disabled:bg-purple-500/40 text-xs"
+          >
+            Backup
           </button>
           
           {/* Delete Button */}
@@ -208,9 +243,10 @@ function FileListItem({ file, download, handleDelete, isLoading: isAppLoading, i
 
       {/* Download Modal */}
       <DownloadModal
-        isOpen={downloadModal}
+        isOpen={downloadModal.isOpen}
         onClose={closeModal}
         file={file}
+        downloadType={downloadModal.type}
         onDownload={download}
       />
     </>
@@ -324,48 +360,44 @@ export default function App() {
   };
 
   // Download function
-   const download = async (id, filename, isSafeDownload = false) => {
-    showNotification(`Downloading "${filename}"...`);
+  const download = async (id, filename, downloadType = 'primary') => {
+    showNotification(`Downloading "${filename}" from ${downloadType} storage...`);
     
-    const tryDownload = async (endpoint, source) => {
-      try {
-        const res = await fetch(endpoint);
-        
-        if (!res.ok) throw new Error('Download failed - File Corrupted');
-        
-        const blob = await res.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        a.remove();
+    let endpoint;
+    switch (downloadType) {
+      case 'primary':
+        endpoint = `${API_URL}/files/${id}`;
+        break;
+      case 'backup':
+        endpoint = `${API_URL}/files-backup/${id}`;
+        break;
+      default:
+        endpoint = `${API_URL}/files/${id}`;
+    }
 
-        showNotification(`Downloaded successfully from ${source}`, 'success');
-        return true;
-      } catch (e) {
-        return false;
-      }
-    };
-
-    // Try primary first
-    const primarySuccess = await tryDownload(`${API_URL}/files/${id}`, 'primary storage');
-    
-    // If primary fails and it's a safe download, try backup
-    if (!primarySuccess && isSafeDownload) {
-      showNotification(`Primary failed, trying backup...`);
-      const backupSuccess = await tryDownload(`${API_URL}/files-backup/${id}`, 'backup storage');
+    try {
+      const res = await fetch(endpoint);
       
-      if (!backupSuccess) {
-        showNotification(`Download failed: File corrupted in both storages`, 'error');
-      }
-    } else if (!primarySuccess) {
-      showNotification(`Download failed: File corrupted`, 'error');
+      if (!res.ok) throw new Error('Download failed - File Corrupted');
+      
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      a.remove();
+
+      // Show success message
+      const source = downloadType === 'backup' ? 'backup storage' : 'primary storage';
+      showNotification(`Downloaded from ${source}`, 'success');
+      
+    } catch (e) {
+      showNotification(`Download failed: ${e.message}`, 'error');
     }
   };
-
 
   const handleDelete = async (id, filename) => {
     if (!window.confirm(`Are you sure you want to delete "${filename}"?`)) return;
@@ -550,8 +582,8 @@ export default function App() {
                   <span className="text-xs text-green-400 flex items-center">✔ All Verified</span>
                 ) : (
                   <label htmlFor="verify-all" className="text-xs text-gray-300 flex items-center cursor-pointer">
-                    {/* <input id="verify-all" type="checkbox" className="h-4 w-4 rounded bg-gray-600 border-gray-500 text-blue-500 focus:ring-blue-500" />
-                    <span className="ml-2">Verify All</span> */}
+                    <input id="verify-all" type="checkbox" className="h-4 w-4 rounded bg-gray-600 border-gray-500 text-blue-500 focus:ring-blue-500" />
+                    <span className="ml-2">Verify All</span>
                   </label>
                 )}
               </div>
