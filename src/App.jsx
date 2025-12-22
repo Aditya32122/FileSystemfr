@@ -162,6 +162,50 @@ function DownloadModal({ isOpen, onClose, file, onDownload }) {
   );
 }
 
+// Corruption Confirmation Modal
+function CorruptionModal({ isOpen, onClose, onConfirm, filename }) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60]">
+      <div className="bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4 border-2 border-red-500/50">
+        <div className="flex items-center space-x-3 mb-4">
+          <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center">
+            <span className="text-red-400 text-2xl">⚠</span>
+          </div>
+          <h3 className="text-lg font-semibold text-white">
+            File Corrupted in Primary Storage
+          </h3>
+        </div>
+        
+        <div className="mb-6">
+          <p className="text-gray-300 text-sm mb-3">
+            The file <span className="text-white font-medium">{filename}</span> is corrupted in the primary storage.
+          </p>
+          <p className="text-gray-400 text-sm">
+            A backup copy is available. Do you want to download from backup storage?
+          </p>
+        </div>
+
+        <div className="flex space-x-3">
+          <button
+            onClick={onClose}
+            className="flex-1 bg-gray-700 text-white px-4 py-2 rounded-lg hover:bg-gray-600 transition-colors text-sm"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={onConfirm}
+            className="flex-1 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-500 transition-colors text-sm"
+          >
+            Download from Backup
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Updated File List Item
 function FileListItem({ file, download, handleDelete, isLoading: isAppLoading, isVerified }) {
   const [downloadModal, setDownloadModal] = useState(false);
@@ -232,6 +276,9 @@ export default function App() {
 
   const [isVerifyingAll, setIsVerifyingAll] = useState(false);
   const [isAllVerified, setIsAllVerified] = useState(false);
+  
+  // Corruption modal state
+  const [corruptionModal, setCorruptionModal] = useState({ isOpen: false, fileId: null, filename: null });
 
   // Health check effect
   useEffect(() => {
@@ -324,7 +371,7 @@ export default function App() {
   };
 
   // Download function
-   const download = async (id, filename, isSafeDownload = false) => {
+  const download = async (id, filename, isSafeDownload = false) => {
     showNotification(`Downloading "${filename}"...`);
     
     const tryDownload = async (endpoint, source) => {
@@ -353,16 +400,39 @@ export default function App() {
     // Try primary first
     const primarySuccess = await tryDownload(`${API_URL}/files/${id}`, 'primary storage');
     
-    // If primary fails and it's a safe download, try backup
+    // If primary fails and it's a safe download, show confirmation modal
     if (!primarySuccess && isSafeDownload) {
-      showNotification(`Primary failed, trying backup...`);
-      const backupSuccess = await tryDownload(`${API_URL}/files-backup/${id}`, 'backup storage');
-      
-      if (!backupSuccess) {
-        showNotification(`Download failed: File corrupted in both storages`, 'error');
-      }
+      setCorruptionModal({ isOpen: true, fileId: id, filename });
     } else if (!primarySuccess) {
       showNotification(`Download failed: File corrupted`, 'error');
+    }
+  };
+
+  // Download from backup after user confirmation
+  const downloadFromBackup = async () => {
+    const { fileId, filename } = corruptionModal;
+    setCorruptionModal({ isOpen: false, fileId: null, filename: null });
+    
+    showNotification(`Downloading from backup...`);
+    
+    try {
+      const res = await fetch(`${API_URL}/files-backup/${fileId}`);
+      
+      if (!res.ok) throw new Error('Backup download failed');
+      
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      a.remove();
+
+      showNotification(`Downloaded successfully from backup storage`, 'success');
+    } catch (e) {
+      showNotification(`Download failed: File corrupted in both storages`, 'error');
     }
   };
 
@@ -573,6 +643,14 @@ export default function App() {
           </div>
         </div>
       </div>
+
+      {/* Corruption Confirmation Modal */}
+      <CorruptionModal
+        isOpen={corruptionModal.isOpen}
+        onClose={() => setCorruptionModal({ isOpen: false, fileId: null, filename: null })}
+        onConfirm={downloadFromBackup}
+        filename={corruptionModal.filename}
+      />
     </>
   );
 }
